@@ -1,13 +1,36 @@
 import streamlit as st
-import csv
 import os
 import zipfile
-import tempfile
+import csv
+import requests
+
+# URLs for your ZIP files on Google Drive
+drive_links = {
+    "part1": "https://drive.google.com/uc?export=download&id=1_5BrrdMC0wnNkH0P57hJS-nhIcIYcHit",
+    "part2": "https://drive.google.com/uc?export=download&id=1RMJDLwyydRse4xuviYtzqs_K06FChiah"
+}
+
+chunk_folder = "euromillions_chunks"
+os.makedirs(chunk_folder, exist_ok=True)
+
+# Auto download and extract ZIP files if not already done
+def download_and_extract(name, url):
+    zip_path = f"{name}.zip"
+    if not os.path.exists(f"{chunk_folder}/combinations_1.csv"):  # Only checks one file to confirm extract
+        with st.spinner(f"Downloading {name}..."):
+            r = requests.get(url)
+            with open(zip_path, 'wb') as f:
+                f.write(r.content)
+        with zipfile.ZipFile(zip_path, 'r') as z:
+            z.extractall(chunk_folder)
+        os.remove(zip_path)
+
+for name, link in drive_links.items():
+    download_and_extract(name, link)
 
 st.set_page_config(page_title="EuroMillions Checker", layout="centered")
 st.title("🎟️ EuroMillions Ticket Checker")
 
-# Ticket input
 input_method = st.radio("Choose input method:", ["Paste tickets", "Upload file"])
 tickets = []
 
@@ -30,43 +53,20 @@ else:
         lines = uploaded_file.read().decode("utf-8").splitlines()
         tickets = [parse_ticket(line) for line in lines if parse_ticket(line)]
 
-# Upload multiple ZIPs
-uploaded_zips = st.file_uploader("Upload one or more combinations ZIP files (max 200MB each)", type="zip", accept_multiple_files=True)
-
-if tickets and uploaded_zips:
+if tickets:
     found = False
-    match_count = 0
-    matched_lines = []
-
-    with st.spinner("🔍 Scanning uploaded files..."):
-        for uploaded_zip in uploaded_zips:
-            with tempfile.TemporaryDirectory() as tmpdirname:
-                with zipfile.ZipFile(uploaded_zip, "r") as zip_ref:
-                    zip_ref.extractall(tmpdirname)
-
-                for file in sorted(os.listdir(tmpdirname)):
-                    if file.endswith(".csv"):
-                        with open(os.path.join(tmpdirname, file), newline="") as f:
-                            reader = csv.DictReader(f)
-                            for row in reader:
-                                combo_main = sorted([int(row[f"Main{i}"]) for i in range(1, 6)])
-                                combo_star = sorted([int(row["Star1"]), int(row["Star2"])])
-
-                                for main, stars in tickets:
-                                    if main == combo_main and stars == combo_star:
-                                        msg = f"🎯 Match: {main} + {stars} → in `{file}`"
-                                        matched_lines.append(msg)
-                                        match_count += 1
-                                        found = True
-
-    if found:
-        st.success(f"✅ Found {match_count} matching ticket(s)")
-        for match in matched_lines:
-            st.markdown(match)
-    else:
-        st.error("❌ No matches found across uploaded ZIPs.")
-
-st.markdown("""
----
-**Tip:** You can upload multiple `.zip` chunks under 200MB to search all at once.
-""")
+    with st.spinner("🔍 Searching all tickets..."):
+        for file in os.listdir(chunk_folder):
+            if file.endswith(".csv"):
+                with open(os.path.join(chunk_folder, file), newline='') as f:
+                    reader = csv.reader(f)
+                    next(reader)
+                    for row in reader:
+                        combo_main = sorted([int(x) for x in row[:5]])
+                        combo_stars = sorted([int(x) for x in row[5:]])
+                        for user_main, user_stars in tickets:
+                            if user_main == combo_main and user_stars == combo_stars:
+                                st.success(f"🎯 Match: {user_main} + {user_stars} ➜ in `{file}`")
+                                found = True
+    if not found:
+        st.error("❌ No matches found.")
