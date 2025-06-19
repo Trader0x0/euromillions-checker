@@ -8,7 +8,6 @@ import urllib.request
 st.set_page_config(page_title="EuroMillions Checker", layout="centered")
 st.title("🎟️ EuroMillions Ticket Checker")
 
-# Ticket input
 input_method = st.radio("Choose input method:", ["Paste tickets", "Upload file"])
 tickets = []
 
@@ -31,11 +30,10 @@ else:
         lines = uploaded_file.read().decode("utf-8").splitlines()
         tickets = [parse_ticket(line) for line in lines if parse_ticket(line)]
 
-# Download and extract zip from Drive
-def download_and_extract(name, link):
-    zip_path = os.path.join(tempfile.gettempdir(), name)
+def download_and_extract(filename, url):
+    zip_path = os.path.join(tempfile.gettempdir(), filename)
     if not os.path.exists(zip_path):
-        with urllib.request.urlopen(link) as response, open(zip_path, 'wb') as out_file:
+        with urllib.request.urlopen(url) as response, open(zip_path, 'wb') as out_file:
             out_file.write(response.read())
 
     temp_dir = tempfile.TemporaryDirectory()
@@ -43,31 +41,34 @@ def download_and_extract(name, link):
         z.extractall(temp_dir.name)
     return temp_dir
 
-# Google Drive direct links (converted from share links)
-links = [
-    "https://drive.google.com/uc?export=download&id=1_5BrrdMC0wnNkH0P57hJS-nhIcIYcHit",  # part1
-    "https://drive.google.com/uc?export=download&id=1RMJDLwyydRse4xuviYtzqs_K06FChiah"   # part2
-]
+# Actual Google Drive part links
+links = {
+    "part1.zip": "https://drive.google.com/uc?export=download&id=1_5BrrdMC0wnNkH0P57hJS-nhIcIYcHit",
+    "part2.zip": "https://drive.google.com/uc?export=download&id=1RMJDLwyydRse4xuviYtzqs_K06FChiah"
+}
 
 # Run checker
 if tickets:
     matches = []
-    for link in links:
-        with st.spinner(f"📂 Downloading & scanning {link}..."):
-            extracted = download_and_extract("combo_chunk.zip", link)
-            for file in os.listdir(extracted.name):
-                if file.endswith(".csv"):
-                    with open(os.path.join(extracted.name, file), newline='') as csvfile:
-                        reader = csv.reader(csvfile)
-                        for row in reader:
-                            combo_main = sorted(map(int, row[:5]))
-                            combo_stars = sorted(map(int, row[5:]))
-                            for ticket_main, ticket_stars in tickets:
-                                if combo_main == ticket_main and combo_stars == ticket_stars:
-                                    matches.append((ticket_main, ticket_stars, file))
+    for name, url in links.items():
+        with st.spinner(f"🔍 Checking {name}..."):
+            try:
+                extracted = download_and_extract(name, url)
+                for file in os.listdir(extracted.name):
+                    if file.endswith(".csv"):
+                        with open(os.path.join(extracted.name, file), newline='') as csvfile:
+                            reader = csv.reader(csvfile)
+                            for row in reader:
+                                combo_main = sorted(map(int, row[:5]))
+                                combo_stars = sorted(map(int, row[5:]))
+                                for ticket_main, ticket_stars in tickets:
+                                    if combo_main == ticket_main and combo_stars == ticket_stars:
+                                        matches.append((ticket_main, ticket_stars, file))
+            except zipfile.BadZipFile:
+                st.error(f"❌ '{name}' is not a valid ZIP file.")
     if matches:
         st.success("✅ MATCH FOUND!")
         for match in matches:
             st.write(f"🎯 {match[0]} + {match[1]} → in {match[2]}")
     else:
-        st.error("❌ No matches found.")
+        st.warning("❌ No matches found.")
