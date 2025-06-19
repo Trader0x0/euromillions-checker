@@ -31,7 +31,7 @@ else:
         lines = uploaded_file.read().decode("utf-8").splitlines()
         tickets = [parse_ticket(line) for line in lines if parse_ticket(line)]
 
-# ---- DOWNLOAD + SCAN ----
+# ---- DOWNLOAD + SCAN FROM DRIVE ----
 def download_and_extract(name, link):
     try:
         with tempfile.TemporaryDirectory() as tmpdirname:
@@ -56,12 +56,15 @@ def download_and_extract(name, link):
     except zipfile.BadZipFile:
         st.error(f"❌ '{name}' is not a valid ZIP file.")
         return False
+    except Exception as e:
+        st.error(f"❌ Error processing '{name}': {e}")
+        return False
 
 # ---- RUN ----
 if tickets:
     links = {
-        "chunk1.zip": "https://drive.google.com/uc?export=download&id=1_gJWdGjEqWlDPyNDesi0JXZCmY3WT8-i",
-        "chunk2.zip": "https://drive.google.com/uc?export=download&id=1o4p4GAAFD4ulnSfzCSJcPA9m07trUk5q"
+        "chunk1.zip": "https://drive.google.com/uc?export=download&id=1o4p4GAAFD4ulnSfzCSJcPA9m07trUk5q",
+        "chunk2.zip": "https://drive.google.com/uc?export=download&id=1_gJWdGjEqWlDPyNDesi0JXZCmY3WT8-i"
     }
 
     found_any = False
