@@ -8,6 +8,7 @@ import urllib.request
 st.set_page_config(page_title="EuroMillions Checker", layout="centered")
 st.title("🎟️ EuroMillions Ticket Checker")
 
+# --- Input selection ---
 input_method = st.radio("Choose input method:", ["Paste tickets", "Upload file"])
 tickets = []
 
@@ -30,45 +31,54 @@ else:
         lines = uploaded_file.read().decode("utf-8").splitlines()
         tickets = [parse_ticket(line) for line in lines if parse_ticket(line)]
 
-def download_and_extract(filename, url):
-    zip_path = os.path.join(tempfile.gettempdir(), filename)
-    if not os.path.exists(zip_path):
-        with urllib.request.urlopen(url) as response, open(zip_path, 'wb') as out_file:
-            out_file.write(response.read())
+# --- Remote ZIPs to download ---
+combo_zip_links = [
+    "https://drive.google.com/uc?export=download&id=1RMJDLwyydRse4xuviYtzqs_K06FChiah",  # part 1
+    "https://drive.google.com/uc?export=download&id=1_5BrrdMC0wnNkH0P57hJS-nhIcIYcHit"   # part 2
+]
 
-    temp_dir = tempfile.TemporaryDirectory()
-    with zipfile.ZipFile(zip_path, 'r') as z:
-        z.extractall(temp_dir.name)
-    return temp_dir
+# --- Match Checker ---
+def download_and_extract(name, link):
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_zip:
+            urllib.request.urlretrieve(link, tmp_zip.name)
 
-# Actual Google Drive part links
-links = {
-    "part1.zip": "https://drive.google.com/uc?export=download&id=1_5BrrdMC0wnNkH0P57hJS-nhIcIYcHit",
-    "part2.zip": "https://drive.google.com/uc?export=download&id=1RMJDLwyydRse4xuviYtzqs_K06FChiah"
-}
+        temp_dir = tempfile.mkdtemp()
+        with zipfile.ZipFile(tmp_zip.name, 'r') as zip_ref:
+            zip_ref.extractall(temp_dir)
+        return temp_dir
+    except zipfile.BadZipFile:
+        st.error(f"❌ '{name}' is not a valid ZIP file.")
+        return None
 
-# Run checker
 if tickets:
+    st.subheader("🔍 Scanning combinations...")
     matches = []
-    for name, url in links.items():
-        with st.spinner(f"🔍 Checking {name}..."):
-            try:
-                extracted = download_and_extract(name, url)
-                for file in os.listdir(extracted.name):
-                    if file.endswith(".csv"):
-                        with open(os.path.join(extracted.name, file), newline='') as csvfile:
-                            reader = csv.reader(csvfile)
+
+    for idx, link in enumerate(combo_zip_links, start=1):
+        zip_label = f"part{idx}.zip"
+        folder = download_and_extract(zip_label, link)
+
+        if folder:
+            with st.spinner(f"Checking {zip_label}..."):
+                for filename in os.listdir(folder):
+                    if filename.endswith(".csv"):
+                        filepath = os.path.join(folder, filename)
+                        with open(filepath, newline="") as f:
+                            reader = csv.reader(f)
                             for row in reader:
-                                combo_main = sorted(map(int, row[:5]))
-                                combo_stars = sorted(map(int, row[5:]))
-                                for ticket_main, ticket_stars in tickets:
-                                    if combo_main == ticket_main and combo_stars == ticket_stars:
-                                        matches.append((ticket_main, ticket_stars, file))
-            except zipfile.BadZipFile:
-                st.error(f"❌ '{name}' is not a valid ZIP file.")
+                                try:
+                                    main = sorted([int(x) for x in row[0].split()])
+                                    stars = sorted([int(x) for x in row[1].split()])
+                                    for t_main, t_stars in tickets:
+                                        if main == t_main and stars == t_stars:
+                                            matches.append((t_main, t_stars, filename))
+                                except:
+                                    continue
+
     if matches:
-        st.success("✅ MATCH FOUND!")
+        st.success("🎉 Match found!")
         for match in matches:
-            st.write(f"🎯 {match[0]} + {match[1]} → in {match[2]}")
+            st.write(f"✔️ Match: {match[0]} + {match[1]} → in `{match[2]}`")
     else:
         st.warning("❌ No matches found.")
