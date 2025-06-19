@@ -1,14 +1,14 @@
 import streamlit as st
-import csv
-import os
 import zipfile
 import tempfile
+import csv
+import os
 import urllib.request
 
 st.set_page_config(page_title="EuroMillions Checker", layout="centered")
 st.title("🎟️ EuroMillions Ticket Checker")
 
-# --- Input selection ---
+# ---- TICKET INPUT ----
 input_method = st.radio("Choose input method:", ["Paste tickets", "Upload file"])
 tickets = []
 
@@ -31,54 +31,44 @@ else:
         lines = uploaded_file.read().decode("utf-8").splitlines()
         tickets = [parse_ticket(line) for line in lines if parse_ticket(line)]
 
-# --- Remote ZIPs to download ---
-combo_zip_links = [
-    "https://drive.google.com/uc?export=download&id=1RMJDLwyydRse4xuviYtzqs_K06FChiah",  # part 1
-    "https://drive.google.com/uc?export=download&id=1_5BrrdMC0wnNkH0P57hJS-nhIcIYcHit"   # part 2
-]
-
-# --- Match Checker ---
+# ---- DOWNLOAD + SCAN FROM DRIVE ----
 def download_and_extract(name, link):
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_zip:
-            urllib.request.urlretrieve(link, tmp_zip.name)
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            zip_path = os.path.join(tmpdirname, name)
+            urllib.request.urlretrieve(link, zip_path)
 
-        temp_dir = tempfile.mkdtemp()
-        with zipfile.ZipFile(tmp_zip.name, 'r') as zip_ref:
-            zip_ref.extractall(temp_dir)
-        return temp_dir
-    except zipfile.BadZipFile:
-        st.error(f"❌ '{name}' is not a valid ZIP file.")
-        return None
-
-if tickets:
-    st.subheader("🔍 Scanning combinations...")
-    matches = []
-
-    for idx, link in enumerate(combo_zip_links, start=1):
-        zip_label = f"part{idx}.zip"
-        folder = download_and_extract(zip_label, link)
-
-        if folder:
-            with st.spinner(f"Checking {zip_label}..."):
-                for filename in os.listdir(folder):
-                    if filename.endswith(".csv"):
-                        filepath = os.path.join(folder, filename)
-                        with open(filepath, newline="") as f:
+            found = False
+            with zipfile.ZipFile(zip_path, 'r') as z:
+                z.extractall(tmpdirname)
+                for file in os.listdir(tmpdirname):
+                    if file.endswith(".csv"):
+                        with open(os.path.join(tmpdirname, file), newline='') as f:
                             reader = csv.reader(f)
                             for row in reader:
-                                try:
-                                    main = sorted([int(x) for x in row[0].split()])
-                                    stars = sorted([int(x) for x in row[1].split()])
-                                    for t_main, t_stars in tickets:
-                                        if main == t_main and stars == t_stars:
-                                            matches.append((t_main, t_stars, filename))
-                                except:
-                                    continue
+                                main = sorted([int(n) for n in row[:5]])
+                                stars = sorted([int(n) for n in row[5:]])
+                                for user_main, user_stars in tickets:
+                                    if user_main == main and user_stars == stars:
+                                        st.success(f"✅ Match: {main} + {stars} → in {file}")
+                                        found = True
+            return found
+    except zipfile.BadZipFile:
+        st.error(f"❌ '{name}' is not a valid ZIP file.")
+        return False
 
-    if matches:
-        st.success("🎉 Match found!")
-        for match in matches:
-            st.write(f"✔️ Match: {match[0]} + {match[1]} → in `{match[2]}`")
-    else:
+# ---- RUN ----
+if tickets:
+    links = {
+        "part1.zip": "https://drive.google.com/uc?export=download&id=1RMJDLwyydRse4xuviYtzqs_K06FChiah",
+        "part2.zip": "https://drive.google.com/uc?export=download&id=1_5BrrdMC0wnNkH0P57hJS-nhIcIYcHit",
+    }
+
+    found_any = False
+    for name, link in links.items():
+        found = download_and_extract(name, link)
+        if found:
+            found_any = True
+
+    if not found_any:
         st.warning("❌ No matches found.")
