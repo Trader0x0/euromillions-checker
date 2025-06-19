@@ -31,7 +31,7 @@ else:
         lines = uploaded_file.read().decode("utf-8").splitlines()
         tickets = [parse_ticket(line) for line in lines if parse_ticket(line)]
 
-# ---- DOWNLOAD + SCAN FROM DRIVE ----
+# ---- DOWNLOAD + SCAN ----
 def download_and_extract(name, link):
     try:
         with tempfile.TemporaryDirectory() as tmpdirname:
@@ -60,8 +60,8 @@ def download_and_extract(name, link):
 # ---- RUN ----
 if tickets:
     links = {
-        "combinations.part1.zip": "https://drive.google.com/uc?export=download&id=1RMJDLwyydRse4xuviYtzqs_K06FChiah",
-        "combinations.part2.zip": "https://drive.google.com/uc?export=download&id=1_5BrrdMC0wnNkH0P57hJS-nhIcIYcHit",
+        "chunk1.zip": "https://drive.google.com/uc?export=download&id=1_gJWdGjEqWlDPyNDesi0JXZCmY3WT8-i",
+        "chunk2.zip": "https://drive.google.com/uc?export=download&id=1o4p4GAAFD4ulnSfzCSJcPA9m07trUk5q"
     }
 
     found_any = False
