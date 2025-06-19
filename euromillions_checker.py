@@ -60,8 +60,8 @@ def download_and_extract(name, link):
 # ---- RUN ----
 if tickets:
     links = {
-        "part1.zip": "https://drive.google.com/uc?export=download&id=1RMJDLwyydRse4xuviYtzqs_K06FChiah",
-        "part2.zip": "https://drive.google.com/uc?export=download&id=1_5BrrdMC0wnNkH0P57hJS-nhIcIYcHit",
+        "combinations.part1.zip": "https://drive.google.com/uc?export=download&id=1RMJDLwyydRse4xuviYtzqs_K06FChiah",
+        "combinations.part2.zip": "https://drive.google.com/uc?export=download&id=1_5BrrdMC0wnNkH0P57hJS-nhIcIYcHit",
     }
 
     found_any = False
